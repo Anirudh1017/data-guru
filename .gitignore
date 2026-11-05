@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+*.local
+
+# Database (regenerated via seed_data.py / fetch_daily.py)
+*.db
+*.db-journal
+*.sqlite3
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+.vite/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Screenshots / local artifacts
+shots/
