@@ -14,6 +14,7 @@ export interface AskResult {
   parsed?: Record<string, unknown>
   supported_commodities?: string[]
   supported_states?: string[]
+  unit_note?: string
 }
 
 export interface HistoryTurn {
@@ -40,7 +41,7 @@ export async function fetchExamples(): Promise<string[]> {
     return [
       'What is the tomato price in Chennai?',
       'Which market has the cheapest onion price?',
-      'Compare the prices of potatoes in Tamil Nadu and Kerala.',
+      'Compare potato prices in Tamil Nadu and Kerala.',
       'How have onion prices moved over the last two weeks?',
     ]
   }

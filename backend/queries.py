@@ -32,7 +32,7 @@ def _infer_chart(columns: list[str]) -> str | None:
         return "line"
     has_numeric = any(k in c for c in lowered for k in ("price", "avg", "modal", "min", "max", "count", "markets"))
     has_label = any(k in c for c in lowered for k in ("market", "state", "district", "commodity"))
-    if has_numeric and has_label:
+    if has_numeric and (has_label or sum(1 for c in lowered if any(k in c for k in ("min", "modal", "max"))) >= 2):
         return "bar"
     return None
 
@@ -42,6 +42,20 @@ def _chart_payload(columns: list[str], rows: list[list]) -> list[dict]:
     if not columns or not rows:
         return []
     lowered = [c.lower() for c in columns]
+    # When only 1 row is returned and it has Min / Modal / Max price columns, chart the Min/Modal/Max breakdown
+    if len(rows) == 1:
+        min_idx = next((i for i, c in enumerate(lowered) if "min" in c), None)
+        mod_idx = next((i for i, c in enumerate(lowered) if "modal" in c), None)
+        max_idx = next((i for i, c in enumerate(lowered) if "max" in c), None)
+        if min_idx is not None and mod_idx is not None and max_idx is not None:
+            r0 = rows[0]
+            pts = []
+            for lbl, idx in (("Min Price", min_idx), ("Modal Price", mod_idx), ("Max Price", max_idx)):
+                if r0[idx] is not None:
+                    pts.append({"name": lbl, "value": float(r0[idx])})
+            if len(pts) >= 2:
+                return pts
+
     date_idx = next((i for i, c in enumerate(lowered) if "date" in c), None)
     label_idx = next((i for i, c in enumerate(lowered) if any(k in c for k in ("market", "state", "district", "commodity"))), None)
     value_idx = next((i for i, c in enumerate(lowered) if any(k in c for k in ("avg", "modal", "price"))), None)
@@ -55,6 +69,59 @@ def _chart_payload(columns: list[str], rows: list[list]) -> list[dict]:
         for row in rows
         if row[value_idx] is not None
     ]
+
+def apply_unit_conversion(result: dict, parsed: dict | None) -> dict:
+    """Append converted Kg / gms column and explicit unit availability + conversion note when requested."""
+    if not parsed:
+        return result
+    req_unit = parsed.get("requested_unit")
+    if not req_unit:
+        return result
+    qty = float(parsed.get("unit_qty") or (100.0 if req_unit == "gm" else 1.0))
+    qty_label = f"{int(qty)}" if qty.is_integer() else f"{qty:g}"
+    unit_header = f"Converted (₹/{qty_label if qty != 1 else ''}{'kg' if req_unit == 'kg' else 'gms'})"
+    unit_short = f"₹/{qty_label if qty != 1 else ''}{'kg' if req_unit == 'kg' else 'gms'}"
+
+    columns = list(result.get("columns") or [])
+    rows = [list(r) for r in (result.get("rows") or [])]
+
+    # Locate representative modal/avg price column
+    lowered = [c.lower() for c in columns]
+    modal_idx = next((i for i, c in enumerate(lowered) if "modal" in c or "avg" in c or "price" in c), None)
+
+    sample_quintal = None
+    sample_conv = None
+    if modal_idx is not None and rows:
+        columns.append(unit_header)
+        for r in rows:
+            val = r[modal_idx]
+            if isinstance(val, (int, float)):
+                per_kg = float(val) / 100.0
+                conv = per_kg * qty if req_unit == "kg" else (per_kg / 1000.0) * qty
+                conv_rounded = round(conv, 2)
+                if sample_quintal is None:
+                    sample_quintal = val
+                    sample_conv = conv_rounded
+                r.append(f"₹{conv_rounded:g}")
+            else:
+                r.append("—")
+        result["columns"] = columns
+        result["rows"] = rows
+
+    conv_example = ""
+    if sample_quintal is not None and sample_conv is not None:
+        conv_example = f" (e.g. ₹{int(sample_quintal):,}/quintal = ₹{sample_conv:g} per {qty_label if qty != 1 else ''}{'kg' if req_unit == 'kg' else 'gms'})"
+
+    note = (
+        f"Kg / gms unit not available in raw AGMARKNET mandi records "
+        f"(all official rates are reported in ₹/quintal; 1 quintal = 100 kg = 100,000 gms) — "
+        f"converted to {unit_short}{conv_example}."
+    )
+    result["unit_note"] = note
+    base_ans = str(result.get("answer") or "").strip()
+    if "kg / gms unit" not in base_ans.lower():
+        result["answer"] = f"{base_ans} {note}".strip()
+    return result
 
 
 def run_query(parsed: dict) -> dict:
@@ -218,8 +285,7 @@ def run_query(parsed: dict) -> dict:
             )
             out = [list(r) for r in rows]
             return {"intent": intent, "answer": answer, "columns": cols, "rows": out, "count": len(out),
-                    "source_date": latest, "sql_used": sql}
-
+                    "source_date": latest, "sql_used": sql, "chart_type": "bar", "chart": _chart_payload(cols, out)}
         # ---------- browse ----------
         # ---------- browse (e.g. bare commodity name like "Tomato") ----------
         cols = ["Market", "District", "State", "Variety", "Modal Price (₹/quintal)"]
@@ -286,6 +352,15 @@ def run_generated_sql(sql: str, parsed: dict | None = None) -> dict:
             answer = "Found 0 matching records in the mandi database."
 
     chart_type = _infer_chart(columns) if count else None
+    chart_data = _chart_payload(columns, rows) if chart_type else []
+    if count and len(chart_data) < 2 and parsed and parsed.get("commodity"):
+        try:
+            fallback_res = run_query(parsed)
+            if fallback_res.get("chart") and len(fallback_res["chart"]) >= 2:
+                chart_type = fallback_res.get("chart_type") or "bar"
+                chart_data = fallback_res["chart"]
+        except Exception:
+            pass
     out: dict = {
         "intent": "llm_sql" if count else ("out_of_scope" if (parsed or {}).get("unknown_subject") else "llm_sql"),
         "answer": answer,
@@ -295,7 +370,7 @@ def run_generated_sql(sql: str, parsed: dict | None = None) -> dict:
         "source_date": latest,
         "sql_used": result["sql"],
         "chart_type": chart_type,
-        "chart": _chart_payload(columns, rows) if chart_type else [],
+        "chart": chart_data,
     }
     if not count and avail_commodities:
         out["supported_commodities"] = avail_commodities

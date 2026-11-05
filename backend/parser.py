@@ -25,6 +25,7 @@ COMPARE_WORDS = ("compare", "comparison", " vs ", "versus", "difference between"
 TREND_WORDS = ("trend", "over time", "history", "historical", "last week", "last month",
                "past week", "past month", "movement", "moved", "change over", "day by day")
 FOLLOWUP_CUES = ("and ", "what about", "how about", "there", "same", "those", "that one", "in kerala", "in tamil")
+VISUAL_WORDS = ("visualize", "visualise", "visualization", "visualisation", "chart", "graph", "plot", "diagram")
 
 STOP_WORDS = {
     "what", "is", "are", "the", "price", "prices", "cost", "rate", "rates", "of", "in",
@@ -37,8 +38,23 @@ STOP_WORDS = {
     "list", "all", "today", "current", "now", "latest", "state", "states", "district",
     "districts", "india", "indian", "agricultural", "agriculture", "commodity", "commodities",
     "please", "about", "there", "same", "those", "that", "one", "per", "quintal", "rupees",
+    "kg", "kgs", "kilogram", "kilograms", "kilo", "kilos", "gm", "gms", "gram", "grams",
+    "visualize", "visualise", "visualization", "visualisation", "chart", "graph", "plot",
+    "diagram", "convert", "converted", "unit", "units",
 }
 
+
+def parse_requested_unit(q: str) -> tuple[str | None, float]:
+    """Detect kg or gram/gms unit requests and optional numeric quantity."""
+    m_gm = re.search(r"(?:(\d+(?:\.\d+)?)\s*)?\b(gms?|grams?)\b", q)
+    if m_gm:
+        qty = float(m_gm.group(1)) if m_gm.group(1) else 100.0
+        return ("gm", qty)
+    m_kg = re.search(r"(?:(\d+(?:\.\d+)?)\s*)?\b(kgs?|kilograms?|kilos?)\b", q)
+    if m_kg:
+        qty = float(m_kg.group(1)) if m_kg.group(1) else 1.0
+        return ("kg", qty)
+    return (None, 1.0)
 
 def is_junk_query(question: str) -> bool:
     """Detect symbol-only, numeric-only, or keyboard-mash gibberish."""
@@ -106,6 +122,8 @@ def parse(question: str, history: list[dict] | None = None) -> dict:
     states = _match_values(q, _distinct("state"))
     districts = _match_values(q, _distinct("district"))
     markets = _match_values(q, _distinct("market"))
+    requested_unit, unit_qty = parse_requested_unit(q)
+    wants_visual = any(w in q for w in VISUAL_WORDS)
 
     intent = "search"
     intent_explicit = True
@@ -115,7 +133,7 @@ def parse(question: str, history: list[dict] | None = None) -> dict:
         intent = "compare"
     elif any(w in q for w in CHEAPEST_WORDS):
         intent = "cheapest"
-    elif any(w in q for w in ("price", "cost", "rate", "how much")):
+    elif any(w in q for w in ("price", "cost", "rate", "how much")) or requested_unit is not None:
         intent = "price"
     else:
         intent_explicit = False
@@ -169,4 +187,7 @@ def parse(question: str, history: list[dict] | None = None) -> dict:
         "inherited": inherited,
         "is_junk": junk,
         "unknown_subject": unknown_subject,
+        "requested_unit": requested_unit,
+        "unit_qty": unit_qty,
+        "wants_visual": wants_visual,
     }

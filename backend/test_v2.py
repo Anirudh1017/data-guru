@@ -33,7 +33,15 @@ try:
     d = ask("What is the tomato price in Chennai?")
     check("price intent", d["intent"] == "price" and d["count"] > 0, d["intent"])
     check("price uses latest date", d["source_date"] == "2026-11-04", d["source_date"])
+    check("price returns chart visualization", len(d.get("chart", [])) >= 2 and d.get("chart_type") == "bar", d.get("chart"))
 
+    d_kg = ask("What is the tomato price per kg in Chennai?")
+    check("kg unit note present", "Kg / gms unit not available" in d_kg["answer"] and "converted" in d_kg["answer"].lower(), d_kg["answer"])
+    check("kg converted column added", any("kg" in c.lower() for c in d_kg["columns"]), d_kg["columns"])
+
+    d_gms = ask("Onion price for 500 gms in Tamil Nadu")
+    check("gms unit note present", "Kg / gms unit not available" in d_gms["answer"] and "500gms" in d_gms["answer"], d_gms["answer"])
+    check("gms converted column added", any("gms" in c.lower() for c in d_gms["columns"]), d_gms["columns"])
     d = ask("Which market has the cheapest onion price?")
     check("cheapest returns 5", d["intent"] == "cheapest" and d["count"] == 5, d["count"])
     check("cheapest sorted asc", [r[3] for r in d["rows"]] == sorted(r[3] for r in d["rows"]))

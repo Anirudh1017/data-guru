@@ -45,22 +45,43 @@ for (const [w, h] of [[1440, 900], [1024, 768], [768, 1024], [390, 844]]) {
   await page.close()
 }
 
-// ---------- portal title + supported parameter directory ----------
+// ---------- portal title + single-frame home + simplified presets ----------
 {
   const page = await newPage(1440, 900)
   await page.goto(BASE, { waitUntil: 'networkidle0' })
   const info = await page.evaluate(() => ({
     docTitle: document.title,
     h1: document.querySelector('.hero h1')?.textContent?.trim() || '',
+    headerSub: document.querySelector('.logo-sub')?.textContent?.trim() || null,
     lead: document.querySelector('.hero-lead')?.textContent?.trim() || '',
-    commodityPills: document.querySelectorAll('.scope-panel .scope-group:first-child .scope-pill').length,
-    statePills: document.querySelectorAll('.scope-panel .scope-group:last-child .scope-pill').length,
+    presetChips: document.querySelectorAll('.hero .chip').length,
+    coverageStats: document.querySelectorAll('.coverage > div').length,
+    scrollHeight: document.documentElement.scrollHeight,
+    clientHeight: document.documentElement.clientHeight,
   }))
-  record('portal: intuitive title & heading', /Mandi Price/i.test(info.docTitle) && /Mandi Price/i.test(info.h1), info)
-  record('portal: lists 6 tracked commodities & 12 states', info.commodityPills === 6 && info.statePills === 12, info)
+  record('portal: title is Indian Mandi Price Portal (no Indian Agricultural)', info.docTitle === 'Indian Mandi Price Portal' && info.h1 === 'Indian Mandi Price Portal' && !/Agricultural/i.test(info.h1), info)
+  record('portal: header does not repeat Indian Mandi Price Portal', info.headerSub === null, info)
+  record('portal: lead says wholesale vegetable rates & omits cheapest mandis', /Search daily wholesale vegetable rates/i.test(info.lead) && !/find the cheapest mandis/i.test(info.lead), info)
+  record('portal: fits in one frame (1440x900) & simplified presets', info.scrollHeight <= info.clientHeight + 2 && info.presetChips === 3 && info.coverageStats === 4, info)
   await page.close()
 }
 
+// ---------- KG / gms unit query + visualization ----------
+{
+  const page = await newPage(1280, 900)
+  await page.goto(`${BASE}/?q=${encodeURIComponent('What is the tomato price in kg in Chennai?')}`, { waitUntil: 'networkidle0' })
+  await page.waitForSelector('.turn', { timeout: 25000 })
+  await new Promise(r => setTimeout(r, 900))
+  const kgRes = await page.evaluate(() => ({
+    answer: document.querySelector('.answer-text')?.textContent || '',
+    unitBanner: document.querySelector('.unit-banner')?.textContent || '',
+    headers: [...document.querySelectorAll('.turn thead th')].map(th => th.textContent?.trim() || ''),
+    bars: document.querySelectorAll('.recharts-bar-rectangle').length,
+    toggleBtns: document.querySelectorAll('.chart-toggle-btn').length,
+  }))
+  record('unit query (kg): shows unit availability message & converted column + chart', /Kg \/ gms unit not available/i.test(kgRes.answer) && kgRes.unitBanner.length > 0 && kgRes.headers.some(h => /kg/i.test(h)) && kgRes.bars >= 2 && kgRes.toggleBtns === 2, kgRes)
+  await page.close()
+}
 // ---------- valid bare commodity ("Tomato"), invalid ("Cloth"), and junk ("@#$%^&*!") ----------
 {
   const page = await newPage()

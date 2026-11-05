@@ -6,7 +6,7 @@ import llm
 import settings
 from db import get_conn, init_db
 from parser import parse
-from queries import run_generated_sql, run_query
+from queries import apply_unit_conversion, run_generated_sql, run_query
 from sql_guard import UnsafeSQLError
 
 app = FastAPI(title="DATA GURU", version="v2")
@@ -50,8 +50,7 @@ def examples():
     return {"examples": [
         "What is the tomato price in Chennai?",
         "Which market has the cheapest onion price?",
-        "Compare the prices of potatoes in Tamil Nadu and Kerala.",
-        "Which market has the lowest tomato price in Tamil Nadu?",
+        "Compare potato prices in Tamil Nadu and Kerala.",
         "How have onion prices moved over the last two weeks?",
     ]}
 
@@ -118,7 +117,7 @@ def ask(req: AskRequest):
         result = run_query(parsed)
         result["parsed"] = parsed
         result["engine"] = "rules"
-
+    result = apply_unit_conversion(result, parsed)
     result["question"] = req.question
     return result
 

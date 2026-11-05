@@ -20,6 +20,7 @@ data.gov.in prices, and AI-written sentences.
 
 ```powershell
 # 1. Clone
+cd d:\    # any user directory
 git clone https://github.com/Anirudh1017/data-guru.git
 cd data-guru
 
@@ -270,3 +271,9 @@ docs/
 - Multi-dataset search (one dataset per department, user picks a source)
 - Persisted conversation history across sessions (currently in-memory per tab)
 - Deployable packaging (the code is CORS + proxy friendly; a single `dist` + FastAPI works)
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for the full release history:
+- **v2.1.0:** Updated title to *Indian Mandi Price Portal* (removed header duplicate and *"Indian Agricultural"*), single-line subtitle (*"Search daily wholesale vegetable rates..."*), full-width single-frame layout with even vertical spacing and 3 essential presets, interactive Bar/Line visualizations for all query types, `Kg / gms` unit availability notice + automatic `₹/quintal → ₹/kg | ₹/gms` conversion, and updated clone instructions (`cd d:\`).
+- **v2.0.0:** Initial V2 release with LLM → SQL read-only guard, deterministic rules fallback, Groq Whisper voice search, multi-turn follow-ups, 21-day trend charts, and data.gov.in live sync.

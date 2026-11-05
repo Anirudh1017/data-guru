@@ -36,6 +36,7 @@ Rules:
 - If the user asks about a non-agricultural item or an item not in mandi_prices (e.g. "Cloth", "Gold"), still filter by `WHERE LOWER(commodity) = '<item>'` so the query cleanly returns 0 rows. Never return unfiltered rows when the user's subject is unrecognizable.
 - For comparisons across states use `GROUP BY state` with `CAST(ROUND(AVG(modal_price)) AS INTEGER) AS avg_modal`.
 - For trends or movements over time (including "last two weeks", "over time", "how have prices moved"), NEVER filter `arrival_date` in the WHERE clause; always query all dates in the table with `GROUP BY arrival_date ORDER BY arrival_date ASC LIMIT 60`.
+- All database prices are in rupees per quintal (1 quintal = 100 kg = 100,000 gms). Always select raw modal_price in rupees per quintal (plus market, district, state); unit conversion to kg/gms is handled downstream.
 - Always include a LIMIT of 200 or less.
 """.strip()
 FEW_SHOT = [
