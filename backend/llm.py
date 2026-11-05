@@ -36,7 +36,7 @@ Rules:
 - If the user asks about a non-agricultural item or an item not in mandi_prices (e.g. "Cloth", "Gold"), still filter by `WHERE LOWER(commodity) = '<item>'` so the query cleanly returns 0 rows. Never return unfiltered rows when the user's subject is unrecognizable.
 - For comparisons across states use `GROUP BY state` with `CAST(ROUND(AVG(modal_price)) AS INTEGER) AS avg_modal`.
 - For trends or movements over time (including "last two weeks", "over time", "how have prices moved"), NEVER filter `arrival_date` in the WHERE clause; always query all dates in the table with `GROUP BY arrival_date ORDER BY arrival_date ASC LIMIT 60`.
-- All database prices are in rupees per quintal (1 quintal = 100 kg = 100,000 gms). Always select raw modal_price in rupees per quintal (plus market, district, state); unit conversion to kg/gms is handled downstream.
+- Wholesale mandi prices are ALWAYS in rupees per quintal (₹/quintal) only; retail units like kg or gms are never used. Always select raw modal_price in rupees per quintal (plus market, district, state).
 - Always include a LIMIT of 200 or less.
 """.strip()
 FEW_SHOT = [
@@ -154,8 +154,11 @@ def phrase_answer(
             "role": "system",
             "content": (
                 "You are DATA GURU. Answer in 1-2 short sentences using ONLY the rows given. "
-                "Prices are rupees per quintal. For date series, explicitly state whether prices "
-                "moved up, moved down, or stayed flat from the first date to the last date. "
+                "Wholesale mandi prices are ALWAYS displayed in rupees per quintal (₹/quintal) only; "
+                "NEVER convert to or quote per-kg or per-gram prices (only retail stores provide kg or gms). "
+                "If the user asked for kg or gms, state the wholesale price in ₹/quintal only and mention that "
+                "wholesale mandi prices are always displayed in quintals only (only retail stores provide kg or gms). "
+                "For date series, explicitly state whether prices moved up, moved down, or stayed flat from the first date to the last date. "
                 "Round sensibly and use Indian digit grouping (e.g. 1,800). "
                 "Do not invent rows, markets or numbers. No markdown."
             ),

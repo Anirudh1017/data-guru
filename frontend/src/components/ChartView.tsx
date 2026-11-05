@@ -1,11 +1,12 @@
 import {
-  Bar, BarChart, CartesianGrid, Cell, Line, LineChart,
+  Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
 
 export interface ChartPoint {
   name: string
   value: number
+  [key: string]: string | number
 }
 
 interface Props {
@@ -14,7 +15,7 @@ interface Props {
   unit?: string
 }
 
-const PALETTE = ['#b7791f', '#8c5a12', '#c9a86a', '#111418', '#5f6368']
+const PALETTE = ['#b7791f', '#111418', '#1f9d55', '#8c5a12', '#5f6368', '#c9a86a']
 
 function shortDate(value: string) {
   const d = new Date(value)
@@ -27,8 +28,15 @@ const money = (value: number) => `₹${Math.round(value).toLocaleString('en-IN')
 export default function ChartView({ type, data, unit = '₹/quintal' }: Props) {
   if (!data.length) return null
 
+  const seriesKeys = Object.keys(data[0] || {}).filter(
+    (k) => k !== 'name' && k !== 'value' && typeof data[0][k] === 'number'
+  )
+  const activeKeys = seriesKeys.length >= 2 ? seriesKeys : ['value']
+
   if (type === 'line') {
-    const values = data.map((d) => d.value)
+    const values = data.flatMap((d) =>
+      activeKeys.map((k) => Number(d[k])).filter((v) => !Number.isNaN(v))
+    )
     const min = Math.min(...values)
     const max = Math.max(...values)
     const pad = Math.max((max - min) * 0.18, max * 0.01, 1)
@@ -55,18 +63,75 @@ export default function ChartView({ type, data, unit = '₹/quintal' }: Props) {
             />
             <Tooltip
               labelFormatter={(label) => shortDate(String(label))}
-              formatter={(v) => [money(Number(v)), unit]}
+              formatter={(v, name) => [
+                money(Number(v)),
+                activeKeys.length > 1 ? String(name).replace(/\s*\(₹\/quintal\)/i, '') : unit,
+              ]}
             />
-            <Line
-              type="monotone"
-              dataKey="value"
-              stroke="#b7791f"
-              strokeWidth={2.2}
-              dot={false}
-              activeDot={{ r: 4, fill: '#111418', stroke: '#fff', strokeWidth: 2 }}
-              isAnimationActive={false}
-            />
+            {activeKeys.length > 1 && (
+              <Legend
+                verticalAlign="top"
+                height={28}
+                formatter={(val) => String(val).replace(/\s*\(₹\/quintal\)/i, '')}
+              />
+            )}
+            {activeKeys.map((key, idx) => (
+              <Line
+                key={key}
+                type="monotone"
+                dataKey={key}
+                stroke={PALETTE[idx % PALETTE.length]}
+                strokeWidth={2.2}
+                dot={false}
+                activeDot={{ r: 4, fill: PALETTE[idx % PALETTE.length], stroke: '#fff', strokeWidth: 2 }}
+                isAnimationActive={false}
+              />
+            ))}
           </LineChart>
+        </ResponsiveContainer>
+      </div>
+    )
+  }
+
+  if (activeKeys.length > 1) {
+    return (
+      <div className="chart">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 8, left: 4, right: 18, bottom: 4 }}>
+            <CartesianGrid vertical={false} stroke="#efede8" />
+            <XAxis
+              dataKey="name"
+              tickFormatter={shortDate}
+              tick={{ fontSize: 11, fill: '#5f6368' }}
+              tickLine={false}
+              axisLine={{ stroke: '#e8e6e1' }}
+            />
+            <YAxis
+              tick={{ fontSize: 11, fill: '#5f6368' }}
+              tickLine={false}
+              axisLine={false}
+              width={52}
+              tickFormatter={(v) => Number(v).toLocaleString('en-IN')}
+            />
+            <Tooltip
+              cursor={{ fill: '#fafaf8' }}
+              formatter={(v, name) => [money(Number(v)), String(name).replace(/\s*\(₹\/quintal\)/i, '')]}
+            />
+            <Legend
+              verticalAlign="top"
+              height={28}
+              formatter={(val) => String(val).replace(/\s*\(₹\/quintal\)/i, '')}
+            />
+            {activeKeys.map((key, idx) => (
+              <Bar
+                key={key}
+                dataKey={key}
+                fill={PALETTE[idx % PALETTE.length]}
+                radius={[4, 4, 0, 0]}
+                isAnimationActive={false}
+              />
+            ))}
+          </BarChart>
         </ResponsiveContainer>
       </div>
     )

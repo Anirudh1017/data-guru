@@ -36,12 +36,22 @@ try:
     check("price returns chart visualization", len(d.get("chart", [])) >= 2 and d.get("chart_type") == "bar", d.get("chart"))
 
     d_kg = ask("What is the tomato price per kg in Chennai?")
-    check("kg unit note present", "Kg / gms unit not available" in d_kg["answer"] and "converted" in d_kg["answer"].lower(), d_kg["answer"])
-    check("kg converted column added", any("kg" in c.lower() for c in d_kg["columns"]), d_kg["columns"])
+    check("kg states wholesale in quintals only", "wholesale mandi prices are always displayed in quintals" in d_kg["answer"].lower() and "only retail stores provide kg or gms" in d_kg["answer"].lower(), d_kg["answer"])
+    check("kg table keeps quintal columns only", not any("converted" in c.lower() for c in d_kg["columns"]), d_kg["columns"])
 
     d_gms = ask("Onion price for 500 gms in Tamil Nadu")
-    check("gms unit note present", "Kg / gms unit not available" in d_gms["answer"] and "500gms" in d_gms["answer"], d_gms["answer"])
-    check("gms converted column added", any("gms" in c.lower() for c in d_gms["columns"]), d_gms["columns"])
+    check("gms states wholesale in quintals only", "wholesale mandi prices are always displayed in quintals" in d_gms["answer"].lower() and "only retail stores provide kg or gms" in d_gms["answer"].lower(), d_gms["answer"])
+
+    d_multi = ask("compare the top two states and provide me a trend graph of all the top 3 vegetables")
+    check("multi-vegetable trend + state compare succeeds without named vegetable", d_multi["count"] == 21 and d_multi["chart_type"] == "line" and len(d_multi.get("chart", [])) == 21, d_multi)
+    check("multi-vegetable answer mentions top 2 states & top 3 vegetables", "Top 2 states comparison" in d_multi["answer"] and "Tomato" in d_multi["answer"] and "Onion" in d_multi["answer"], d_multi["answer"])
+
+    d_gen_cheap = ask("Which market has the cheapest vegetable price?")
+    check("generic cheapest vegetable without specific name succeeds", d_gen_cheap["count"] > 0 and d_gen_cheap["intent"] == "cheapest", d_gen_cheap)
+
+    d_gen_price = ask("Show me vegetable prices in Chennai")
+    check("generic vegetable prices in Chennai without specific name succeeds", d_gen_price["count"] > 0, d_gen_price)
+
     d = ask("Which market has the cheapest onion price?")
     check("cheapest returns 5", d["intent"] == "cheapest" and d["count"] == 5, d["count"])
     check("cheapest sorted asc", [r[3] for r in d["rows"]] == sorted(r[3] for r in d["rows"]))

@@ -275,5 +275,6 @@ docs/
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for the full release history:
-- **v2.1.0:** Updated title to *Indian Mandi Price Portal* (removed header duplicate and *"Indian Agricultural"*), single-line subtitle (*"Search daily wholesale vegetable rates..."*), full-width single-frame layout with even vertical spacing and 3 essential presets, interactive Bar/Line visualizations for all query types, `Kg / gms` unit availability notice + automatic `₹/quintal → ₹/kg | ₹/gms` conversion, and updated clone instructions (`cd d:\`).
+- **v2.2.0:** Multi-series trend and comparison charts, category-wide aggregate query support, persistent commodity and state quick-filter directory on result views, and wholesale quintal-only (`₹/quintal`) unit policy guidance.
+- **v2.1.0:** Streamlined *Indian Mandi Price Portal* single-frame layout, interactive Bar/Line chart switcher across all query intents, and updated setup documentation.
 - **v2.0.0:** Initial V2 release with LLM → SQL read-only guard, deterministic rules fallback, Groq Whisper voice search, multi-turn follow-ups, 21-day trend charts, and data.gov.in live sync.

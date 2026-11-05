@@ -38,7 +38,7 @@ def _infer_chart(columns: list[str]) -> str | None:
 
 
 def _chart_payload(columns: list[str], rows: list[list]) -> list[dict]:
-    """Pick label + value columns for the chart component."""
+    """Pick label + value columns (or multi-series pivot) for the chart component."""
     if not columns or not rows:
         return []
     lowered = [c.lower() for c in columns]
@@ -57,10 +57,47 @@ def _chart_payload(columns: list[str], rows: list[list]) -> list[dict]:
                 return pts
 
     date_idx = next((i for i, c in enumerate(lowered) if "date" in c), None)
+
+    # Wide table where multiple numeric columns represent series across dates (e.g. Date | Tomato | Onion | Potato)
+    if date_idx is not None and len(columns) >= 3:
+        non_date_numeric = [
+            i for i, c in enumerate(lowered)
+            if i != date_idx and "record" not in c and "count" not in c
+            and any(isinstance(r[i], (int, float)) for r in rows if r[i] is not None)
+        ]
+        if len(non_date_numeric) >= 2:
+            pts = []
+            for row in rows:
+                first_val = next((float(row[i]) for i in non_date_numeric if row[i] is not None), 0.0)
+                entry: dict = {"name": str(row[date_idx]), "value": first_val}
+                for i in non_date_numeric:
+                    if row[i] is not None:
+                        entry[columns[i]] = float(row[i])
+                pts.append(entry)
+            return pts
+
     label_idx = next((i for i, c in enumerate(lowered) if any(k in c for k in ("market", "state", "district", "commodity"))), None)
     value_idx = next((i for i, c in enumerate(lowered) if any(k in c for k in ("avg", "modal", "price"))), None)
     if value_idx is None:
         return []
+
+    # Multi-series date trend (e.g. Date + Commodity + Avg Modal Price)
+    if date_idx is not None and label_idx is not None and label_idx != date_idx:
+        by_date: dict[str, dict] = {}
+        series_names: list[str] = []
+        for row in rows:
+            if row[value_idx] is None or row[date_idx] is None or row[label_idx] is None:
+                continue
+            d_str = str(row[date_idx])
+            s_name = str(row[label_idx])
+            val = float(row[value_idx])
+            if s_name not in series_names:
+                series_names.append(s_name)
+            if d_str not in by_date:
+                by_date[d_str] = {"name": d_str, "value": val}
+            by_date[d_str][s_name] = val
+        if len(series_names) >= 2 and len(by_date) >= 2:
+            return [by_date[k] for k in sorted(by_date.keys())]
     label = date_idx if date_idx is not None else label_idx
     if label is None:
         return []
@@ -70,59 +107,24 @@ def _chart_payload(columns: list[str], rows: list[list]) -> list[dict]:
         if row[value_idx] is not None
     ]
 
+
 def apply_unit_conversion(result: dict, parsed: dict | None) -> dict:
-    """Append converted Kg / gms column and explicit unit availability + conversion note when requested."""
+    """Enforce wholesale quintal-only pricing when Kg or gms units are requested."""
     if not parsed:
         return result
     req_unit = parsed.get("requested_unit")
     if not req_unit:
         return result
-    qty = float(parsed.get("unit_qty") or (100.0 if req_unit == "gm" else 1.0))
-    qty_label = f"{int(qty)}" if qty.is_integer() else f"{qty:g}"
-    unit_header = f"Converted (₹/{qty_label if qty != 1 else ''}{'kg' if req_unit == 'kg' else 'gms'})"
-    unit_short = f"₹/{qty_label if qty != 1 else ''}{'kg' if req_unit == 'kg' else 'gms'}"
-
-    columns = list(result.get("columns") or [])
-    rows = [list(r) for r in (result.get("rows") or [])]
-
-    # Locate representative modal/avg price column
-    lowered = [c.lower() for c in columns]
-    modal_idx = next((i for i, c in enumerate(lowered) if "modal" in c or "avg" in c or "price" in c), None)
-
-    sample_quintal = None
-    sample_conv = None
-    if modal_idx is not None and rows:
-        columns.append(unit_header)
-        for r in rows:
-            val = r[modal_idx]
-            if isinstance(val, (int, float)):
-                per_kg = float(val) / 100.0
-                conv = per_kg * qty if req_unit == "kg" else (per_kg / 1000.0) * qty
-                conv_rounded = round(conv, 2)
-                if sample_quintal is None:
-                    sample_quintal = val
-                    sample_conv = conv_rounded
-                r.append(f"₹{conv_rounded:g}")
-            else:
-                r.append("—")
-        result["columns"] = columns
-        result["rows"] = rows
-
-    conv_example = ""
-    if sample_quintal is not None and sample_conv is not None:
-        conv_example = f" (e.g. ₹{int(sample_quintal):,}/quintal = ₹{sample_conv:g} per {qty_label if qty != 1 else ''}{'kg' if req_unit == 'kg' else 'gms'})"
 
     note = (
-        f"Kg / gms unit not available in raw AGMARKNET mandi records "
-        f"(all official rates are reported in ₹/quintal; 1 quintal = 100 kg = 100,000 gms) — "
-        f"converted to {unit_short}{conv_example}."
+        "Wholesale mandi prices are always displayed in quintals (₹/quintal) only — "
+        "only retail stores provide kg or gms rates (Kg / gms unit not available)."
     )
     result["unit_note"] = note
     base_ans = str(result.get("answer") or "").strip()
-    if "kg / gms unit" not in base_ans.lower():
-        result["answer"] = f"{base_ans} {note}".strip()
+    if "wholesale mandi prices are always displayed in quintals" not in base_ans.lower():
+        result["answer"] = f"{note} {base_ans}".strip()
     return result
-
 
 def run_query(parsed: dict) -> dict:
     intent = parsed["intent"]
@@ -161,21 +163,169 @@ def run_query(parsed: dict) -> dict:
 
         if not commodity:
             subj = parsed.get("unknown_subject")
-            prefix = (
-                f'"{subj}" is not an agricultural commodity tracked in this mandi database. '
-                if subj
-                else "No tracked commodity was found in your search. "
+            if subj:
+                return {
+                    "intent": "out_of_scope",
+                    "answer": (
+                        f'"{subj}" is not an agricultural commodity tracked in this mandi database. '
+                        f"Available commodities: {avail} (across {len(state_list)} states). "
+                        f'Try: "What is the tomato price in Chennai?" or "Which market has the cheapest onion price?"'
+                    ),
+                    "columns": [], "rows": [], "count": 0, "source_date": latest, "sql_used": None,
+                    "supported_commodities": avail_commodities,
+                    "supported_states": state_list,
+                }
+
+            # General / multi-commodity queries without a single named vegetable
+            has_compare = bool(parsed.get("has_compare"))
+            has_trend = bool(parsed.get("has_trend"))
+
+            # Combined state comparison + multi-vegetable trend (e.g. "compare the top two states and provide me a trend graph of all the top 3 vegetables")
+            if has_trend:
+                top_vegs = [c for c in ("Tomato", "Onion", "Potato") if c in avail_commodities]
+                if len(top_vegs) < 3:
+                    top_vegs = avail_commodities[:3]
+                ph_v = ",".join("?" for _ in top_vegs)
+                sql = (
+                    f"SELECT arrival_date, commodity, CAST(ROUND(AVG(modal_price)) AS INTEGER) AS avg_modal "
+                    f"FROM mandi_prices WHERE commodity IN ({ph_v}) "
+                    f"GROUP BY arrival_date, commodity ORDER BY arrival_date ASC, commodity ASC"
+                )
+                raw_rows = conn.execute(sql, top_vegs).fetchall()
+                by_date: dict[str, dict[str, int]] = {}
+                for d_val, c_val, p_val in raw_rows:
+                    by_date.setdefault(d_val, {})[c_val] = int(p_val)
+                cols = ["Date", *[f"{v} (₹/quintal)" for v in top_vegs]]
+                out = [
+                    [d_key, *[by_date[d_key].get(v, 0) for v in top_vegs]]
+                    for d_key in sorted(by_date.keys())
+                ]
+
+                state_summary = ""
+                if has_compare:
+                    st_sql = (
+                        f"SELECT state, CAST(ROUND(AVG(modal_price)) AS INTEGER) AS avg_p, COUNT(*) AS cnt "
+                        f"FROM mandi_prices WHERE commodity IN ({ph_v}) AND arrival_date=? "
+                        + (f"AND state IN ({','.join('?' for _ in states)}) " if len(states) >= 2 else "")
+                        + "GROUP BY state ORDER BY cnt DESC, avg_p ASC LIMIT 2"
+                    )
+                    st_params = [*top_vegs, latest, *(states if len(states) >= 2 else [])]
+                    st_rows = conn.execute(st_sql, st_params).fetchall()
+                    if len(st_rows) >= 2:
+                        state_summary = (
+                            f"Top 2 states comparison ({_fmt_date(latest)}): {st_rows[0][0]} averages "
+                            f"₹{st_rows[0][1]:,}/quintal vs {st_rows[1][0]} at ₹{st_rows[1][1]:,}/quintal across {', '.join(top_vegs)}. "
+                        )
+                answer = (
+                    f"{state_summary}21-day wholesale price trend across the top {len(top_vegs)} vegetables "
+                    f"({', '.join(top_vegs)}) in ₹/quintal from {_fmt_date(out[0][0]) if out else ''} to {_fmt_date(out[-1][0]) if out else ''}."
+                )
+                return {
+                    "intent": "trend",
+                    "answer": answer,
+                    "columns": cols,
+                    "rows": out,
+                    "count": len(out),
+                    "source_date": latest,
+                    "sql_used": sql,
+                    "chart_type": "line",
+                    "chart": _chart_payload(cols, out),
+                    "supported_commodities": avail_commodities,
+                    "supported_states": state_list,
+                }
+
+            if intent == "compare":
+                cols = ["State", "Avg Modal Price (₹/quintal)", "Commodities", "Markets Covered"]
+                where_st = f"AND state IN ({','.join('?' for _ in states)}) " if states else ""
+                sql = (
+                    f"SELECT state, CAST(ROUND(AVG(modal_price)) AS INTEGER), COUNT(DISTINCT commodity), COUNT(DISTINCT market) "
+                    f"FROM mandi_prices WHERE arrival_date=? {where_st}"
+                    f"GROUP BY state ORDER BY AVG(modal_price) ASC LIMIT 12"
+                )
+                params = [latest, *states] if states else [latest]
+                rows = conn.execute(sql, params).fetchall()
+                out = [list(r) for r in rows]
+                cheapest_st = out[0] if out else ["—", 0]
+                answer = (
+                    f"Comparing wholesale mandi prices across {len(out)} states (as of {_fmt_date(latest)}): "
+                    f"{cheapest_st[0]} has the lowest overall average modal rate at ₹{cheapest_st[1]:,}/quintal."
+                )
+                return {
+                    "intent": "compare",
+                    "answer": answer,
+                    "columns": cols,
+                    "rows": out,
+                    "count": len(out),
+                    "source_date": latest,
+                    "sql_used": sql,
+                    "chart_type": "bar",
+                    "chart": _chart_payload(cols, out),
+                    "supported_commodities": avail_commodities,
+                    "supported_states": state_list,
+                }
+
+            if intent == "cheapest":
+                cols = ["Commodity", "Market", "District", "State", "Modal Price (₹/quintal)"]
+                where_st = "AND state=? " if states else ""
+                sql = (
+                    f"SELECT commodity, market, district, state, modal_price FROM mandi_prices "
+                    f"WHERE arrival_date=? AND modal_price IS NOT NULL {where_st}"
+                    f"ORDER BY modal_price ASC LIMIT 10"
+                )
+                params = [latest, states[0]] if states else [latest]
+                rows = conn.execute(sql, params).fetchall()
+                out = [list(r) for r in rows]
+                scope = f" in {states[0]}" if states else ""
+                answer = (
+                    f"Lowest wholesale mandi rates{scope} on {_fmt_date(latest)}: "
+                    f"{out[0][0]} at {out[0][1]} ({out[0][3]}) is ₹{out[0][4]:,}/quintal."
+                    if out else f"No records found{scope}."
+                )
+                return {
+                    "intent": "cheapest",
+                    "answer": answer,
+                    "columns": cols,
+                    "rows": out,
+                    "count": len(out),
+                    "source_date": latest,
+                    "sql_used": sql,
+                    "chart_type": "bar",
+                    "chart": _chart_payload(cols, out),
+                    "supported_commodities": avail_commodities,
+                    "supported_states": state_list,
+                }
+
+            # Default overview across all tracked commodities (for price / search without a specific vegetable)
+            cols = ["Commodity", "Avg Modal Price (₹/quintal)", "Min Price (₹/quintal)", "Max Price (₹/quintal)", "Markets"]
+            where_st = "AND state=? " if states else ("AND district=? " if districts else ("AND market=? " if markets else ""))
+            place_param = [states[0]] if states else ([districts[0]] if districts else ([markets[0]] if markets else []))
+            place_label = (markets or districts or states or [""])[0]
+            sql = (
+                f"SELECT commodity, CAST(ROUND(AVG(modal_price)) AS INTEGER), MIN(min_price), MAX(max_price), COUNT(DISTINCT market) "
+                f"FROM mandi_prices WHERE arrival_date=? {where_st}"
+                f"GROUP BY commodity ORDER BY AVG(modal_price) ASC"
+            )
+            rows = conn.execute(sql, [latest, *place_param]).fetchall()
+            out = [list(r) for r in rows]
+            scope = f" in {place_label}" if place_label else " across India"
+            answer = (
+                f"Wholesale mandi price summary{scope} for {_fmt_date(latest)} across {len(out)} tracked commodities "
+                f"(all rates in ₹/quintal)."
             )
             return {
-                "intent": "out_of_scope" if subj else "unknown",
-                "answer": (
-                    f"{prefix}Available commodities: {avail} (across {len(state_list)} states). "
-                    f'Try: "What is the tomato price in Chennai?" or "Which market has the cheapest onion price?"'
-                ),
-                "columns": [], "rows": [], "count": 0, "source_date": latest, "sql_used": None,
+                "intent": intent if intent != "unknown" else "search",
+                "answer": answer,
+                "columns": cols,
+                "rows": out,
+                "count": len(out),
+                "source_date": latest,
+                "sql_used": sql,
+                "chart_type": "bar",
+                "chart": _chart_payload(cols, out),
                 "supported_commodities": avail_commodities,
                 "supported_states": state_list,
             }
+
         # ---------- trend over time ----------
         if intent == "trend":
             cols = ["Date", "Avg Modal Price (₹/quintal)", "Records"]

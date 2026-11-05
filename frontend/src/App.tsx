@@ -199,13 +199,50 @@ export default function App() {
                 ))}
               </div>
             )}
+            {hasResult && meta && (
+              <section className="result-directory" aria-label="Tracked commodities and states">
+                <div className="result-dir-row">
+                  <span className="result-dir-label">Commodities:</span>
+                  <div className="result-dir-pills">
+                    {meta.commodities.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        className="scope-pill scope-pill-action"
+                        onClick={() => void run(c)}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="result-dir-row">
+                  <span className="result-dir-label">States ({meta.states.length}):</span>
+                  <div className="result-dir-pills">
+                    {meta.states.map((s) => {
+                      const activeCommodity = String(latest?.result?.parsed?.commodity || 'tomato').toLowerCase()
+                      return (
+                        <button
+                          key={s}
+                          type="button"
+                          className="scope-pill"
+                          onClick={() => void run(`Which market has the lowest ${activeCommodity} price in ${s}?`)}
+                        >
+                          {s}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </section>
+            )}
           </div>
           {!hasResult && meta && (
             <div className="home-bottom">
               <section className="coverage" aria-label="Dataset coverage">
                 <div><strong>{meta.total_records.toLocaleString('en-IN')}</strong><span>records loaded</span></div>
-                <div><strong>{meta.commodities.length}</strong><span>commodities</span></div>
-                <div><strong>{meta.states.length}</strong><span>states</span></div>
+                <div><strong>{meta.commodities.length}</strong><span>commodities ({meta.commodities.join(', ')})</span></div>
+                <div><strong>{meta.states.length}</strong><span>states covered</span></div>
                 <div><strong>{meta.days}</strong><span>days of history</span></div>
               </section>
             </div>
@@ -234,7 +271,7 @@ export default function App() {
 
                   {r.unit_note && (
                     <div className="unit-banner" role="note">
-                      <strong>Unit Conversion (₹/quintal → Kg / gms):</strong> {r.unit_note}
+                      <strong>Wholesale Unit Policy (₹/quintal only):</strong> {r.unit_note}
                     </div>
                   )}
 

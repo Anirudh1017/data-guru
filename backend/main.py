@@ -77,13 +77,21 @@ def _llm_answer(req: AskRequest, history: list[dict], parsed: dict) -> dict | No
     """Try the LLM path. Returns None so the caller can fall back to rules."""
     if not llm.available() or parsed.get("is_junk"):
         return None
+    # For multi-commodity trend/compare queries without a specific named commodity,
+    # or when retail kg/gms units are requested, use the deterministic rule engine
+    # so multi-series pivoted charts and wholesale quintal-only pricing are guaranteed.
+    if parsed.get("requested_unit") is not None:
+        return None
+    if not parsed.get("commodity") and not parsed.get("unknown_subject") and (parsed.get("has_trend") or parsed.get("has_compare")):
+        return None
     try:
         generated = llm.generate_sql(req.question, history)
         sql = generated["sql"]
-        # If no known commodity/place was parsed and the LLM didn't filter with a WHERE clause,
+        # If an unknown out-of-scope subject was parsed and the LLM didn't filter with a WHERE clause,
         # reject unfiltered table dumps so out-of-scope queries don't return random rows.
         if (
-            not parsed.get("commodity")
+            parsed.get("unknown_subject")
+            and not parsed.get("commodity")
             and not parsed.get("states")
             and not parsed.get("districts")
             and not parsed.get("markets")

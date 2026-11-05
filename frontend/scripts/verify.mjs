@@ -66,7 +66,7 @@ for (const [w, h] of [[1440, 900], [1024, 768], [768, 1024], [390, 844]]) {
   await page.close()
 }
 
-// ---------- KG / gms unit query + visualization ----------
+// ---------- KG / gms unit query + persistent commodities/states bar ----------
 {
   const page = await newPage(1280, 900)
   await page.goto(`${BASE}/?q=${encodeURIComponent('What is the tomato price in kg in Chennai?')}`, { waitUntil: 'networkidle0' })
@@ -78,11 +78,29 @@ for (const [w, h] of [[1440, 900], [1024, 768], [768, 1024], [390, 844]]) {
     headers: [...document.querySelectorAll('.turn thead th')].map(th => th.textContent?.trim() || ''),
     bars: document.querySelectorAll('.recharts-bar-rectangle').length,
     toggleBtns: document.querySelectorAll('.chart-toggle-btn').length,
+    dirCommodities: document.querySelectorAll('.result-directory .result-dir-row:first-child .scope-pill').length,
+    dirStates: document.querySelectorAll('.result-directory .result-dir-row:last-child .scope-pill').length,
   }))
-  record('unit query (kg): shows unit availability message & converted column + chart', /Kg \/ gms unit not available/i.test(kgRes.answer) && kgRes.unitBanner.length > 0 && kgRes.headers.some(h => /kg/i.test(h)) && kgRes.bars >= 2 && kgRes.toggleBtns === 2, kgRes)
+  record('unit query (kg): states wholesale price in quintals only (retail only for kg/gms)', /wholesale mandi prices are always displayed in quintals/i.test(kgRes.answer) && /only retail stores provide kg or gms/i.test(kgRes.answer) && kgRes.unitBanner.length > 0 && !kgRes.headers.some(h => /converted/i.test(h)) && kgRes.bars >= 2, kgRes)
+  record('result view: keeps list of 6 commodities & 12 states visible after answer is shown', kgRes.dirCommodities === 6 && kgRes.dirStates === 12, kgRes)
   await page.close()
 }
-// ---------- valid bare commodity ("Tomato"), invalid ("Cloth"), and junk ("@#$%^&*!") ----------
+
+// ---------- multi-vegetable trend + top two states comparison without named vegetable ----------
+{
+  const page = await newPage(1280, 900)
+  await page.goto(`${BASE}/?q=${encodeURIComponent('compare the top two states and provide me a trend graph of all the top 3 vegetables')}`, { waitUntil: 'networkidle0' })
+  await page.waitForSelector('.turn', { timeout: 25000 })
+  await new Promise(r => setTimeout(r, 1000))
+  const multiRes = await page.evaluate(() => ({
+    answer: document.querySelector('.answer-text')?.textContent || '',
+    lines: document.querySelectorAll('.recharts-line-curve').length,
+    legendItems: document.querySelectorAll('.recharts-legend-item').length,
+    rows: document.querySelectorAll('.turn tbody tr').length,
+  }))
+  record('multi-vegetable query ("compare the top two states and provide me a trend graph of all the top 3 vegetables"): renders 3-line trend chart & comparison', multiRes.lines === 3 && multiRes.legendItems === 3 && multiRes.rows === 21 && /Top 2 states comparison/i.test(multiRes.answer), multiRes)
+  await page.close()
+}
 {
   const page = await newPage()
   await page.goto(`${BASE}/?q=Tomato`, { waitUntil: 'networkidle0' })
