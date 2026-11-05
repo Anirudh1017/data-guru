@@ -275,6 +275,7 @@ docs/
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for the full release history:
+- **v2.3.0:** Redesigned two-card bento directory (*Tracked Vegetables & Crops* `2×3` + *Covered States* `2×6`), compact centered search bar, single-line coverage metrics, and uniform vertical rhythm across the single-frame home view.
 - **v2.2.0:** Multi-series trend and comparison charts, category-wide aggregate query support, persistent commodity and state quick-filter directory on result views, and wholesale quintal-only (`₹/quintal`) unit policy guidance.
 - **v2.1.0:** Streamlined *Indian Mandi Price Portal* single-frame layout, interactive Bar/Line chart switcher across all query intents, and updated setup documentation.
 - **v2.0.0:** Initial V2 release with LLM → SQL read-only guard, deterministic rules fallback, Groq Whisper voice search, multi-turn follow-ups, 21-day trend charts, and data.gov.in live sync.

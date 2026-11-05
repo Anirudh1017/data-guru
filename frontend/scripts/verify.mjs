@@ -78,8 +78,8 @@ for (const [w, h] of [[1440, 900], [1024, 768], [768, 1024], [390, 844]]) {
     headers: [...document.querySelectorAll('.turn thead th')].map(th => th.textContent?.trim() || ''),
     bars: document.querySelectorAll('.recharts-bar-rectangle').length,
     toggleBtns: document.querySelectorAll('.chart-toggle-btn').length,
-    dirCommodities: document.querySelectorAll('.result-directory .result-dir-row:first-child .scope-pill').length,
-    dirStates: document.querySelectorAll('.result-directory .result-dir-row:last-child .scope-pill').length,
+    dirCommodities: document.querySelectorAll('.result-dir-pills-crops .scope-pill').length,
+    dirStates: document.querySelectorAll('.result-dir-pills-states .scope-pill').length,
   }))
   record('unit query (kg): states wholesale price in quintals only (retail only for kg/gms)', /wholesale mandi prices are always displayed in quintals/i.test(kgRes.answer) && /only retail stores provide kg or gms/i.test(kgRes.answer) && kgRes.unitBanner.length > 0 && !kgRes.headers.some(h => /converted/i.test(h)) && kgRes.bars >= 2, kgRes)
   record('result view: keeps list of 6 commodities & 12 states visible after answer is shown', kgRes.dirCommodities === 6 && kgRes.dirStates === 12, kgRes)

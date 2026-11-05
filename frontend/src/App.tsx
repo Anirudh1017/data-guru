@@ -199,11 +199,16 @@ export default function App() {
                 ))}
               </div>
             )}
-            {hasResult && meta && (
+          </div>
+          {meta && (
+            <div className="home-bottom">
               <section className="result-directory" aria-label="Tracked commodities and states">
-                <div className="result-dir-row">
-                  <span className="result-dir-label">Commodities:</span>
-                  <div className="result-dir-pills">
+                <div className="dir-card">
+                  <div className="dir-card-head">
+                    <h2>Tracked Vegetables &amp; Crops</h2>
+                    <span>{meta.commodities.length} wholesale commodities</span>
+                  </div>
+                  <div className="result-dir-pills result-dir-pills-crops">
                     {meta.commodities.map((c) => (
                       <button
                         key={c}
@@ -216,9 +221,12 @@ export default function App() {
                     ))}
                   </div>
                 </div>
-                <div className="result-dir-row">
-                  <span className="result-dir-label">States ({meta.states.length}):</span>
-                  <div className="result-dir-pills">
+                <div className="dir-card">
+                  <div className="dir-card-head">
+                    <h2>Covered States</h2>
+                    <span>{meta.states.length} AGMARKNET regions</span>
+                  </div>
+                  <div className="result-dir-pills result-dir-pills-states">
                     {meta.states.map((s) => {
                       const activeCommodity = String(latest?.result?.parsed?.commodity || 'tomato').toLowerCase()
                       return (
@@ -235,16 +243,15 @@ export default function App() {
                   </div>
                 </div>
               </section>
-            )}
-          </div>
-          {!hasResult && meta && (
-            <div className="home-bottom">
-              <section className="coverage" aria-label="Dataset coverage">
-                <div><strong>{meta.total_records.toLocaleString('en-IN')}</strong><span>records loaded</span></div>
-                <div><strong>{meta.commodities.length}</strong><span>commodities ({meta.commodities.join(', ')})</span></div>
-                <div><strong>{meta.states.length}</strong><span>states covered</span></div>
-                <div><strong>{meta.days}</strong><span>days of history</span></div>
-              </section>
+
+              {!hasResult && (
+                <section className="coverage" aria-label="Dataset coverage">
+                  <div><strong>{meta.total_records.toLocaleString('en-IN')}</strong><span>records loaded</span></div>
+                  <div><strong>{meta.commodities.length}</strong><span>commodities</span></div>
+                  <div><strong>{meta.states.length}</strong><span>states covered</span></div>
+                  <div><strong>{meta.days}</strong><span>days of history</span></div>
+                </section>
+              )}
             </div>
           )}
         </section>

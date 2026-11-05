@@ -2,6 +2,15 @@
 
 All notable changes to **DATA GURU — Indian Mandi Price Portal** are documented in this file.
 
+## [2.3.0] — 2026-11-05
+
+### Changed
+- **Two-Card Bento Parameter Directory**:
+  - Redesigned the commodity and state selector into a side-by-side bento layout (**Tracked Vegetables & Crops** in a `2×3` grid and **Covered States** in a sleek `2×6` grid) visible on both home and result views.
+  - Slimmed pill height and elongated horizontal proportions so both directory cards align at an identical two-row height.
+- **Compact Search Bar & Balanced Single-Frame Rhythm**:
+  - Centered and shortened the search bar (`max-width: 720px`), compacted the 4-stat dataset coverage strip into single-line metric tiles, and equalized vertical spacing (`24px` cadence) across all sections in the viewport frame.
+
 ## [2.2.0] — 2026-11-05
 
 ### Added
