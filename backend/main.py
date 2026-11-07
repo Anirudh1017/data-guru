@@ -35,8 +35,11 @@ class AskRequest(BaseModel):
 @app.get("/api/health")
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": "v2"}
-
+     return {"status": "ok", "version": "v2"}
+ 
+@app.get("/v1/models")
+def models():
+    return {"data": [{"id": settings.LLM_MODEL or "gpt-oss-120b", "object": "model"}]}
 @app.get("/api/status")
 def status():
     with get_conn() as conn:

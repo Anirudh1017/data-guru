@@ -6,16 +6,28 @@ and a chart, from your own database.
 **Runs with no API key.** Add one and the same app answers with LLM-generated SQL, live
 data.gov.in prices, and AI-written sentences.
 
+## Demo Video
+
+Watch the complete video walkthrough of the portal — direct city price lookups, interactive Bar/Line chart switching, multi-turn conversational follow-ups, and the wholesale quintal-only policy:
+
+https://github.com/Anirudh1017/data-guru/raw/main/docs/demo.mp4
+
+*(Direct file download: [`docs/demo.mp4`](docs/demo.mp4))*
+
+---
+
+## Screenshots
+
 ![home](docs/v2-home.png)
 
 ![answer](docs/v2-result.png)
 
 ![trend](docs/v2-trend.png)
-
 ![conversation](docs/v2-followup.png)
 
-## Clone & run (from scratch)
+---
 
+## Clone & run (from scratch)
 **Prerequisites** — Python 3.10+, Node 18+, Git.
 
 ```powershell
