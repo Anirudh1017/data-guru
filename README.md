@@ -10,10 +10,11 @@ data.gov.in prices, and AI-written sentences.
 
 Watch the complete video walkthrough of the portal — direct city price lookups, interactive Bar/Line chart switching, multi-turn conversational follow-ups, and the wholesale quintal-only policy:
 
-https://github.com/Anirudh1017/data-guru/raw/main/docs/demo.mp4
+<video src="https://github.com/Anirudh1017/data-guru/raw/main/docs/demo.mp4" controls="controls" width="100%" style="max-width: 100%;">
+  Your browser does not support the video tag.
+</video>
 
-*(Direct file download: [`docs/demo.mp4`](docs/demo.mp4))*
-
+*(Or view directly on GitHub: [Watch demo.mp4](docs/demo.mp4))*
 ---
 
 ## Screenshots
